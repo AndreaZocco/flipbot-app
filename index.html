@@ -506,6 +506,7 @@
     const km = String(editing.km ?? 30);
     if (![...$("fKm").options].some((o) => o.value === km)) $("fKm").append(el("option", { value: km }, `${km} km`));
     $("fKm").value = km;
+    $("fKm").disabled = !!(editing.lo && editing.km == null);  // regione: il raggio lo calcola il bot
     $("fCat").value = editing.c ?? "";
     $("fTopic").value = editing.t ?? "";
     $("formErr").textContent = "";
@@ -529,7 +530,7 @@
       r: getSeg("fRating") === "" ? null : Number(getSeg("fRating")),
       rv: num($("fReviews").value), ns: $("fNoShop").checked ? 1 : 0, sh: $("fShip").checked ? 1 : 0,
       co: [...$("fCond").querySelectorAll("button.on")].map((b) => b.dataset.v),
-      lo: $("fLoc").value.trim() || null, km: $("fLoc").value.trim() ? Number($("fKm").value) : null,
+      lo: $("fLoc").value.trim() || null, km: $("fLoc").value.trim() && !$("fKm").disabled ? Number($("fKm").value) : null,
     };
     if (!["subito", "wallapop"].includes(s.p)) return "Scegli la piattaforma.";
     if (!s.k) return "Scrivi cosa cerchi.";
@@ -556,6 +557,9 @@
     if (await confirmMsg(`Eliminare “${editing.k}”?`)) { pushOp({ op: "del", id: editing.i }); show("list"); }
   });
   $("btnNew").addEventListener("click", () => openEditor(null));
+  $("fLoc").addEventListener("input", () => {
+    $("fKm").disabled = !!(editing.lo && editing.km == null && $("fLoc").value.trim() === editing.lo);
+  });
   $("fCond").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { b.classList.toggle("on"); haptic(); } });
 
   // ---------- importazione da link ---------------------------------------
@@ -568,14 +572,16 @@
     let host = "";
     try { host = new URL(url).hostname; } catch (_) {}
     if (!/(^|\.)(subito\.it|wallapop\.com)$/.test(host)) { $("importErr").textContent = "Serve un link di subito.it o wallapop.com."; return; }
+    if (url.length > 2000) { $("importErr").textContent = "Link troppo lungo (max 2000 caratteri)."; return; }
     if (ops.some((o) => o.op === "import" && o.url === url)) { $("importErr").textContent = "Link già aggiunto."; return; }
     $("importErr").textContent = ""; $("fUrl").value = ""; $("importBox").classList.add("hidden");
     haptic("medium");
     ops.push({ op: "import", url }); render();
   });
   function renderImports() {
+    const qs = (u) => { try { return decodeURIComponent(u.search); } catch (_) { return u.search; } };  // "%" spaiati
     $("imports").replaceChildren(...ops.filter((o) => o.op === "import").map((o) => el("div", { class: "pending-import" },
-      el("span", {}, "🔗 ", el("b", {}, new URL(o.url).hostname.replace(/^www\./, "")), " · ", decodeURIComponent(new URL(o.url).search).slice(0, 80)),
+      el("span", {}, "🔗 ", el("b", {}, new URL(o.url).hostname.replace(/^www\./, "")), " · ", qs(new URL(o.url)).slice(0, 80)),
       el("button", { type: "button", "aria-label": "Annulla", onclick: () => { ops = ops.filter((x) => x !== o); render(); } }, "×"))));
   }
 
