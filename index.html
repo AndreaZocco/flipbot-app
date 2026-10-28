@@ -138,8 +138,8 @@
     <div class="field">
       <label class="lbl">Prezzo (€)</label>
       <div class="two">
-        <input type="number" id="fMin" inputmode="decimal" min="0" placeholder="min">
-        <input type="number" id="fMax" inputmode="decimal" min="0" placeholder="max">
+        <input type="text" id="fMin" inputmode="decimal" placeholder="min" autocomplete="off">
+        <input type="text" id="fMax" inputmode="decimal" placeholder="max" autocomplete="off">
       </div>
       <div class="help">Consiglio: max ≈ 1/3 del prezzo a cui lo rivendi.</div>
     </div>
@@ -296,7 +296,7 @@
     const list = $("list"), items = current();
     list.replaceChildren();
     $("subtitle").textContent = items.length
-      ? `${items.length} ricerch${items.length === 1 ? "a" : "e"} · tocca per modificare`
+      ? `${items.length} ${items.length === 1 ? "ricerca" : "ricerche"} · tocca per modificare`
       : "Nessuna ricerca ancora.";
     if (!items.length) list.append(el("div", { class: "empty" }, "Crea la prima ricerca con “Nuova ricerca”."));
     for (const s of items) {
@@ -371,27 +371,34 @@
     }
   }
 
+  // aggiunge le parole valide e restituisce il testo scartato, che resta nel campo per correggerlo
   function addChip(kind, raw) {
-    const errs = $("formErr");
-    for (const piece of raw.split(",")) {
-      const t = piece.trim();
+    const errs = $("formErr"), rejected = [], pieces = raw.split(",");
+    for (let n = 0; n < pieces.length; n++) {
+      const t = pieces[n].trim();
       if (!t) continue;
-      if (chipState[kind].length >= 20) { errs.textContent = "Massimo 20 parole per lista."; break; }
+      if (chipState[kind].length >= 20) {
+        errs.textContent = "Massimo 20 parole per lista.";
+        rejected.push(...pieces.slice(n).map((x) => x.trim()).filter(Boolean));
+        break;
+      }
       if (kind === "in") {
         const alts = t.split("|").map((a) => a.trim()).filter(Boolean);
-        if (alts.some((a) => a.length > 40)) { errs.textContent = "Parola troppo lunga (max 40)."; continue; }
+        if (alts.some((a) => a.length > 40)) { errs.textContent = "Parola troppo lunga (max 40)."; rejected.push(t); continue; }
+        if (alts.length > 20) { errs.textContent = "Massimo 20 alternative per parola."; rejected.push(t); continue; }
         if (alts.length) chipState.in.push(alts);
       } else {
-        if (t.length > 40) { errs.textContent = "Parola troppo lunga (max 40)."; continue; }
+        if (t.length > 40) { errs.textContent = "Parola troppo lunga (max 40)."; rejected.push(t); continue; }
         if (!chipState.ex.some((x) => x.toLowerCase() === t.toLowerCase())) chipState.ex.push(t);
       }
     }
     renderChips(kind);
+    return rejected.join(", ");
   }
 
   function bindChipInput(kind) {
     const input = $(kind === "ex" ? "fExIn" : "fInIn");
-    const commit = () => { if (input.value.trim()) { addChip(kind, input.value); input.value = ""; } };
+    const commit = () => { if (input.value.trim()) input.value = addChip(kind, input.value); };
     input.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commit(); } });
     input.addEventListener("blur", commit);
   }
@@ -430,8 +437,11 @@
 
   function readForm() {
     // le parole ancora nel campo di testo contano come confermate
-    for (const k of ["ex", "in"]) { const inp = $(k === "ex" ? "fExIn" : "fInIn"); if (inp.value.trim()) { addChip(k, inp.value); inp.value = ""; } }
-    const num = (v) => v === "" ? null : Number(v);
+    for (const k of ["ex", "in"]) {
+      const inp = $(k === "ex" ? "fExIn" : "fInIn");
+      if (inp.value.trim() && (inp.value = addChip(k, inp.value))) return $("formErr").textContent || "Controlla le parole.";
+    }
+    const num = (v) => v.trim() === "" ? null : Number(v.trim().replace(",", "."));  // tastiere italiane: "12,5"
     const s = {
       p: getSeg("fPlatform"), k: $("fKeyword").value.trim(),
       mn: num($("fMin").value), mx: num($("fMax").value),
@@ -446,7 +456,7 @@
       if (v !== null && (!Number.isFinite(v) || v < 0)) return `Prezzo ${name} non valido.`;
     if (s.mn !== null && s.mx !== null && s.mn > s.mx) return "Il prezzo minimo supera il massimo.";
     if (s.rv !== null && (!Number.isInteger(s.rv) || s.rv < 0)) return "Recensioni minime: numero intero ≥ 0.";
-    if (s.t !== null && (!Number.isInteger(s.t) || s.t < 2)) return "ID Topic non valido.";
+    if (s.t !== null && (!Number.isInteger(s.t) || s.t < 2 || s.t > 2147483647)) return "ID Topic non valido.";
     for (const k of Object.keys(s)) if (s[k] === null || (Array.isArray(s[k]) && !s[k].length) || s[k] === 0) delete s[k];
     return s;
   }
