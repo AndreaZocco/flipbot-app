@@ -101,6 +101,16 @@
   .suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .suggest button { appearance: none; border: 1px dashed var(--sep); background: transparent; color: var(--hint);
     font: inherit; font-size: 13px; padding: 3px 9px; border-radius: 999px; cursor: pointer; }
+  .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opts button { appearance: none; border: 1px solid var(--sep); background: var(--bg); color: var(--text);
+    font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+  .opts button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid transparent;
+    border-radius: 10px; padding: 9px 10px; }
+  .loc { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+  .pending-import { display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    background: var(--card); border-radius: var(--radius); padding: 10px 14px; font-size: 14px; overflow-wrap: anywhere; }
+  .pending-import button { appearance: none; border: 0; background: transparent; color: var(--danger); font-size: 18px; cursor: pointer; }
   .err { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 1em; }
   details summary { cursor: pointer; color: var(--link); padding: 12px 14px; list-style: none; }
   details summary::-webkit-details-marker { display: none; }
@@ -116,7 +126,40 @@
   <p class="sub" id="subtitle">Tocca una ricerca per modificarla.</p>
   <div id="banner" class="banner hidden"></div>
   <div id="list" class="list"></div>
-  <div style="margin-top:12px"><button class="btn ghost" id="btnNew">＋ Nuova ricerca</button></div>
+  <div style="margin-top:12px" class="row-btns">
+    <button class="btn ghost" id="btnNew">＋ Nuova ricerca</button>
+    <button class="btn ghost" id="btnImport">🔗 Da link</button>
+  </div>
+  <div id="importBox" class="section hidden" style="margin-top:10px">
+    <div class="field">
+      <label class="lbl" for="fUrl">Incolla il link di una ricerca fatta su Subito o Wallapop</label>
+      <input type="text" id="fUrl" inputmode="url" placeholder="https://www.subito.it/annunci-…" autocomplete="off">
+      <div class="help">Vengono importati parola cercata, prezzi, categoria, condizione, zona e spedizione.</div>
+      <div class="err" id="importErr"></div>
+      <button class="btn primary" id="btnImportAdd" style="margin-top:8px">Aggiungi</button>
+    </div>
+  </div>
+  <div id="imports" class="list" style="margin-top:10px"></div>
+
+  <h2>Impostazioni</h2>
+  <div class="section">
+    <div class="field inline">
+      <span>🌙 Notifiche senza suono di notte</span>
+      <label class="switch"><input type="checkbox" id="fQuietOn"><span></span></label>
+    </div>
+    <div class="field" id="quietHours">
+      <label class="lbl">Dalle … alle …</label>
+      <div class="two"><select id="fQuietFrom"></select><select id="fQuietTo"></select></div>
+      <div class="help">Le schede arrivano comunque, solo senza suono né vibrazione.</div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fDigest">📚 Riepilogo unico quando arrivano insieme almeno</label>
+      <select id="fDigest">
+        <option value="3">3 annunci</option><option value="5">5 annunci</option>
+        <option value="10">10 annunci</option><option value="0">mai (sempre schede singole)</option>
+      </select>
+    </div>
+  </div>
 </main>
 
 <main id="viewEdit" class="hidden">
@@ -188,6 +231,32 @@
     </div>
   </div>
 
+  <h2>Condizione e zona</h2>
+  <div class="section">
+    <div class="field">
+      <label class="lbl">Condizione (nessuna selezionata = tutte)</label>
+      <div class="opts" id="fCond">
+        <button type="button" data-v="nuovo">Nuovo</button>
+        <button type="button" data-v="come_nuovo">Come nuovo</button>
+        <button type="button" data-v="ottimo">Ottimo</button>
+        <button type="button" data-v="buono">Buono</button>
+        <button type="button" data-v="danneggiato">Danneggiato</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fLoc">Zona (vuoto = tutta Italia)</label>
+      <div class="loc">
+        <input type="text" id="fLoc" maxlength="80" placeholder="es. MI, Monza, Lombardia" autocomplete="off">
+        <select id="fKm" aria-label="Raggio">
+          <option value="10">10 km</option><option value="20">20 km</option><option value="30">30 km</option>
+          <option value="50">50 km</option><option value="100">100 km</option><option value="200">200 km</option>
+        </select>
+      </div>
+      <div class="help">Sigla, provincia, comune o regione. Su Subito vale la provincia (o la regione);
+        su Wallapop il raggio attorno al luogo.</div>
+    </div>
+  </div>
+
   <h2>Spedizione</h2>
   <div class="section">
     <div class="field inline">
@@ -256,6 +325,8 @@
   let nextTmp = -1;           // id temporanei per le ricerche nuove
   let editing = null;         // ricerca in modifica (copia)
   let notice = "";            // avviso persistente (errori di caricamento, anteprima)
+  let settings = { q: null, dg: 5 };   // impostazioni globali dal bot
+  const COND_LABEL = { nuovo: "Nuovo", come_nuovo: "Come nuovo", ottimo: "Ottimo", buono: "Buono", danneggiato: "Danneggiato" };
 
   async function decodeState(b64) {
     const pad = b64.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64.length + 3) % 4);
@@ -309,6 +380,8 @@
       if (s.rv) pills.push(el("span", { class: "pill" }, `≥${s.rv} rec.`));
       if (s.ns) pills.push(el("span", { class: "pill" }, "no negozi"));
       if (s.sh) pills.push(el("span", { class: "pill" }, "📦 spedizione"));
+      if (s.co && s.co.length) pills.push(el("span", { class: "pill" }, s.co.map((c) => COND_LABEL[c] || c).join(", ")));
+      if (s.lo) pills.push(el("span", { class: "pill" }, "📍 " + s.lo + (s.km && s.p === "wallapop" ? ` · ${s.km} km` : "")));
       if (s.t) pills.push(el("span", { class: "pill" }, `topic ${s.t}`));
 
       const sw = el("input", { type: "checkbox", "aria-label": "Attiva" });
@@ -324,6 +397,7 @@
         swWrap,
         el("div", { class: "meta" }, ...pills)));
     }
+    renderImports();
     const n = ops.length, banner = $("banner");
     banner.className = "banner" + (n ? "" : notice ? " warn" : " hidden");
     if (n) banner.replaceChildren(el("span", {}, el("b", {}, `${n} modific${n === 1 ? "a" : "he"}`),
@@ -427,6 +501,11 @@
     $("fReviews").value = editing.rv ?? "";
     $("fNoShop").checked = !!editing.ns;
     $("fShip").checked = !!editing.sh;
+    for (const b of $("fCond").querySelectorAll("button")) b.classList.toggle("on", (editing.co || []).includes(b.dataset.v));
+    $("fLoc").value = editing.lo ?? "";
+    const km = String(editing.km ?? 30);
+    if (![...$("fKm").options].some((o) => o.value === km)) $("fKm").append(el("option", { value: km }, `${km} km`));
+    $("fKm").value = km;
     $("fCat").value = editing.c ?? "";
     $("fTopic").value = editing.t ?? "";
     $("formErr").textContent = "";
@@ -449,6 +528,8 @@
       in: chipState.in, ex: chipState.ex, d: $("fDesc").checked ? 1 : 0,
       r: getSeg("fRating") === "" ? null : Number(getSeg("fRating")),
       rv: num($("fReviews").value), ns: $("fNoShop").checked ? 1 : 0, sh: $("fShip").checked ? 1 : 0,
+      co: [...$("fCond").querySelectorAll("button.on")].map((b) => b.dataset.v),
+      lo: $("fLoc").value.trim() || null, km: $("fLoc").value.trim() ? Number($("fKm").value) : null,
     };
     if (!["subito", "wallapop"].includes(s.p)) return "Scegli la piattaforma.";
     if (!s.k) return "Scrivi cosa cerchi.";
@@ -475,6 +556,52 @@
     if (await confirmMsg(`Eliminare “${editing.k}”?`)) { pushOp({ op: "del", id: editing.i }); show("list"); }
   });
   $("btnNew").addEventListener("click", () => openEditor(null));
+  $("fCond").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { b.classList.toggle("on"); haptic(); } });
+
+  // ---------- importazione da link ---------------------------------------
+  $("btnImport").addEventListener("click", () => {
+    $("importBox").classList.toggle("hidden");
+    if (!$("importBox").classList.contains("hidden")) $("fUrl").focus();
+  });
+  $("btnImportAdd").addEventListener("click", () => {
+    const url = $("fUrl").value.trim();
+    let host = "";
+    try { host = new URL(url).hostname; } catch (_) {}
+    if (!/(^|\.)(subito\.it|wallapop\.com)$/.test(host)) { $("importErr").textContent = "Serve un link di subito.it o wallapop.com."; return; }
+    if (ops.some((o) => o.op === "import" && o.url === url)) { $("importErr").textContent = "Link già aggiunto."; return; }
+    $("importErr").textContent = ""; $("fUrl").value = ""; $("importBox").classList.add("hidden");
+    haptic("medium");
+    ops.push({ op: "import", url }); render();
+  });
+  function renderImports() {
+    $("imports").replaceChildren(...ops.filter((o) => o.op === "import").map((o) => el("div", { class: "pending-import" },
+      el("span", {}, "🔗 ", el("b", {}, new URL(o.url).hostname.replace(/^www\./, "")), " · ", decodeURIComponent(new URL(o.url).search).slice(0, 80)),
+      el("button", { type: "button", "aria-label": "Annulla", onclick: () => { ops = ops.filter((x) => x !== o); render(); } }, "×"))));
+  }
+
+  // ---------- impostazioni ------------------------------------------------
+  for (const id of ["fQuietFrom", "fQuietTo"])
+    $(id).replaceChildren(...Array.from({ length: 24 }, (_, h) => el("option", { value: String(h) }, `${String(h).padStart(2, "0")}:00`)));
+  function renderSettings() {
+    const q = settings.q;
+    $("fQuietOn").checked = !!q;
+    $("quietHours").classList.toggle("hidden", !q);
+    $("fQuietFrom").value = String(q ? q[0] : 23);
+    $("fQuietTo").value = String(q ? q[1] : 8);
+    $("fDigest").value = String(settings.dg ?? 5);
+  }
+  function onSettingsChange() {
+    const on = $("fQuietOn").checked;
+    $("quietHours").classList.toggle("hidden", !on);
+    const q = on ? [Number($("fQuietFrom").value), Number($("fQuietTo").value)] : null;
+    if (q && q[0] === q[1]) { alertMsg("Inizio e fine del silenzio non possono coincidere."); $("fQuietTo").value = String((q[0] + 8) % 24); return onSettingsChange(); }
+    const op = { op: "settings", q, dg: Number($("fDigest").value) };
+    ops = ops.filter((o) => o.op !== "settings");
+    const same = JSON.stringify(op.q) === JSON.stringify(settings.q ?? null) && op.dg === (settings.dg ?? 5);
+    if (!same) ops.push(op);
+    haptic(); render();
+  }
+  for (const id of ["fQuietOn", "fQuietFrom", "fQuietTo", "fDigest"]) $(id).addEventListener("change", onSettingsChange);
   $("fallbackSave").addEventListener("click", save);
   bindChipInput("ex"); bindChipInput("in");
 
@@ -495,7 +622,11 @@
     }
     const param = new URLSearchParams(location.search).get("s");
     if (param) {
-      try { searches = await decodeState(param); }
+      try {
+        const st = await decodeState(param);
+        if (Array.isArray(st)) searches = st;                     // formato della prima versione
+        else { searches = st.s || []; settings = { q: st.cfg?.q ?? null, dg: st.cfg?.dg ?? 5 }; }
+      }
       catch (e) {
         notice = "Impossibile leggere le ricerche: aggiorna Telegram o riapri dal bottone del bot.";
         console.error(e);
@@ -503,6 +634,7 @@
     } else if (!inTelegram) {
       notice = "Anteprima fuori da Telegram: apri la pagina dal bottone “🗂 Gestisci ricerche” del bot.";
     }
+    renderSettings();
     show("list");
   }
   init();
