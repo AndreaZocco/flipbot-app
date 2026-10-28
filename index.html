@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Flipbot – Ricerche</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-secondary-bg-color, #f1f2f6);
+    --card: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #ffffff));
+    --text: var(--tg-theme-text-color, #111418);
+    --hint: var(--tg-theme-hint-color, #7d8590);
+    --accent: var(--tg-theme-button-color, #2f80ed);
+    --accent-text: var(--tg-theme-button-text-color, #ffffff);
+    --link: var(--tg-theme-link-color, #2f80ed);
+    --danger: var(--tg-theme-destructive-text-color, #e5484d);
+    --sep: var(--tg-theme-section-separator-color, rgba(125, 133, 144, .22));
+    --subito: #e9433f;
+    --wallapop: #13c1ac;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-tg]) {
+      --bg: #0f1115; --card: #1a1d23; --text: #e8eaed; --hint: #8b93a0; --sep: rgba(255, 255, 255, .08);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { padding: 12px 16px calc(96px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 22px; margin: 4px 0 2px; letter-spacing: -.01em; }
+  h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--hint); margin: 22px 4px 8px; }
+  .sub { color: var(--hint); font-size: 13px; margin: 0 0 14px; }
+  .hidden { display: none !important; }
+
+  .banner { background: color-mix(in srgb, var(--accent) 14%, var(--card)); color: var(--text);
+    border-radius: var(--radius); padding: 10px 14px; margin-bottom: 12px; font-size: 14px;
+    display: flex; gap: 10px; align-items: center; }
+  .banner b { color: var(--accent); }
+  .banner.warn { background: color-mix(in srgb, var(--danger) 14%, var(--card)); }
+
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .item { background: var(--card); border-radius: var(--radius); padding: 12px 14px;
+    display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; cursor: pointer; }
+  .item.paused { opacity: .55; }
+  .item .title { font-weight: 600; font-size: 16px; overflow-wrap: anywhere; display: flex; gap: 8px; align-items: center; }
+  .item .meta { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: #fff; flex: none; }
+  .badge.subito { background: var(--subito); }
+  .badge.wallapop { background: var(--wallapop); }
+  .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--hint);
+    overflow-wrap: anywhere; }
+  .pill.ex { color: var(--danger); }
+  .pill.new { color: var(--accent); font-weight: 600; }
+  .empty { text-align: center; color: var(--hint); padding: 36px 12px; background: var(--card); border-radius: var(--radius); }
+
+  .btn { appearance: none; border: 0; border-radius: 12px; padding: 12px 16px; font: inherit; font-weight: 600;
+    cursor: pointer; width: 100%; }
+  .btn.primary { background: var(--accent); color: var(--accent-text); }
+  .btn.ghost { background: var(--card); color: var(--link); }
+  .btn.danger { background: var(--card); color: var(--danger); }
+  .row-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+
+  /* switch */
+  .switch { position: relative; width: 46px; height: 28px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch span { position: absolute; inset: 0; background: var(--sep); border-radius: 999px; transition: .2s; }
+  .switch span::after { content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(18px); }
+  .switch input:disabled + span { opacity: .4; }
+
+  /* form */
+  .section { background: var(--card); border-radius: var(--radius); overflow: hidden; }
+  .field { padding: 12px 14px; border-bottom: 1px solid var(--sep); }
+  .field:last-child { border-bottom: 0; }
+  .field.inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  label.lbl { display: block; font-size: 13px; color: var(--hint); margin-bottom: 6px; }
+  .help { font-size: 12px; color: var(--hint); margin-top: 6px; }
+  input[type=text], input[type=number], input[type=search] {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid transparent;
+    border-radius: 10px; padding: 10px 12px; outline: none; }
+  input:focus { border-color: var(--accent); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--bg); border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button { appearance: none; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px;
+    padding: 8px 4px; border-radius: 8px; cursor: pointer; }
+  .seg button.on { background: var(--card); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .seg button.on.subito { color: var(--subito); }
+  .seg button.on.wallapop { color: var(--wallapop); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chips:empty { display: none; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 10px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 14%, var(--bg)); font-size: 14px; overflow-wrap: anywhere; }
+  .chip.ex { background: color-mix(in srgb, var(--danger) 14%, var(--bg)); }
+  .chip button { appearance: none; border: 0; background: transparent; color: var(--hint); font-size: 16px;
+    line-height: 1; padding: 2px 4px; cursor: pointer; }
+  .suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .suggest button { appearance: none; border: 1px dashed var(--sep); background: transparent; color: var(--hint);
+    font: inherit; font-size: 13px; padding: 3px 9px; border-radius: 999px; cursor: pointer; }
+  .err { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 1em; }
+  details summary { cursor: pointer; color: var(--link); padding: 12px 14px; list-style: none; }
+  details summary::-webkit-details-marker { display: none; }
+
+  #dev { margin-top: 24px; font: 12px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--hint);
+    white-space: pre-wrap; overflow-wrap: anywhere; background: var(--card); border-radius: var(--radius); padding: 12px; }
+  #fallbackSave { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); width: auto; }
+</style>
+</head>
+<body>
+<main id="viewList">
+  <h1>Le tue ricerche</h1>
+  <p class="sub" id="subtitle">Tocca una ricerca per modificarla.</p>
+  <div id="banner" class="banner hidden"></div>
+  <div id="list" class="list"></div>
+  <div style="margin-top:12px"><button class="btn ghost" id="btnNew">＋ Nuova ricerca</button></div>
+</main>
+
+<main id="viewEdit" class="hidden">
+  <h1 id="editTitle">Nuova ricerca</h1>
+  <p class="sub">Le modifiche si applicano dal prossimo controllo.</p>
+
+  <div class="section">
+    <div class="field">
+      <label class="lbl">Piattaforma</label>
+      <div class="seg" id="fPlatform">
+        <button type="button" data-v="subito" class="subito">Subito</button>
+        <button type="button" data-v="wallapop" class="wallapop">Wallapop</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fKeyword">Cosa cerchi</label>
+      <input type="text" id="fKeyword" maxlength="80" placeholder="es. nintendo switch oled" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="lbl">Prezzo (€)</label>
+      <div class="two">
+        <input type="number" id="fMin" inputmode="decimal" min="0" placeholder="min">
+        <input type="number" id="fMax" inputmode="decimal" min="0" placeholder="max">
+      </div>
+      <div class="help">Consiglio: max ≈ 1/3 del prezzo a cui lo rivendi.</div>
+    </div>
+  </div>
+
+  <h2>Parole</h2>
+  <div class="section">
+    <div class="field">
+      <label class="lbl" for="fExIn">🚫 Escludi se il titolo contiene</label>
+      <div class="chips" id="exChips"></div>
+      <input type="text" id="fExIn" placeholder="scrivi e premi Invio" autocomplete="off" enterkeyhint="done">
+      <div class="suggest" id="exSuggest"></div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fInIn">✅ Il titolo deve contenere</label>
+      <div class="chips" id="inChips"></div>
+      <input type="text" id="fInIn" placeholder="es. slim   ·   alternative: ps5|playstation 5" autocomplete="off" enterkeyhint="done">
+      <div class="help">Ogni parola qui è obbligatoria. Con <b>|</b> indichi alternative: basta una.
+        Le parole valgono anche come inizio parola: “rott” trova rotto, rotta, rotti.</div>
+    </div>
+    <div class="field inline">
+      <span>Cerca anche nella descrizione</span>
+      <label class="switch"><input type="checkbox" id="fDesc"><span></span></label>
+    </div>
+  </div>
+
+  <h2>Venditore</h2>
+  <div class="section">
+    <div class="field">
+      <label class="lbl">Valutazione minima</label>
+      <div class="seg" id="fRating">
+        <button type="button" data-v="">Qualsiasi</button>
+        <button type="button" data-v="4">4★+</button>
+        <button type="button" data-v="4.5">4,5★+</button>
+        <button type="button" data-v="4.8">4,8★+</button>
+      </div>
+      <div class="help">Un venditore senza recensioni non ha voto: con un minimo impostato viene escluso.</div>
+    </div>
+    <div class="field">
+      <label class="lbl" for="fReviews">Recensioni minime</label>
+      <input type="number" id="fReviews" inputmode="numeric" min="0" step="1" placeholder="nessun minimo">
+    </div>
+    <div class="field inline">
+      <span>Escludi negozi e professionisti</span>
+      <label class="switch"><input type="checkbox" id="fNoShop"><span></span></label>
+    </div>
+  </div>
+
+  <h2>Spedizione</h2>
+  <div class="section">
+    <div class="field inline">
+      <span>Solo annunci con spedizione</span>
+      <label class="switch"><input type="checkbox" id="fShip"><span></span></label>
+    </div>
+  </div>
+
+  <h2>Avanzate</h2>
+  <div class="section">
+    <details>
+      <summary>Categoria e Topic</summary>
+      <div class="field">
+        <label class="lbl" for="fCat">ID categoria (opzionale)</label>
+        <input type="text" id="fCat" maxlength="20" placeholder="es. 44 = Console e Videogiochi su Subito" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="lbl" for="fTopic">ID Topic del supergruppo (opzionale)</label>
+        <input type="number" id="fTopic" inputmode="numeric" min="2" step="1" placeholder="vuoto = chat principale">
+        <div class="help">È il numero centrale del link di un messaggio nel Topic: t.me/c/…/<b>ID</b>/…</div>
+      </div>
+    </details>
+  </div>
+
+  <div class="err" id="formErr"></div>
+  <div class="row-btns">
+    <button class="btn ghost" id="btnCancel">Annulla</button>
+    <button class="btn primary" id="btnApply">Applica</button>
+  </div>
+  <div style="margin-top:10px"><button class="btn danger hidden" id="btnDelete">Elimina ricerca</button></div>
+</main>
+
+<button class="btn primary hidden" id="fallbackSave"></button>
+<pre id="dev" class="hidden"></pre>
+
+<script>
+(() => {
+  "use strict";
+  const tg = window.Telegram && window.Telegram.WebApp;
+  // fuori da Telegram lo script ufficiale imposta platform = "unknown"
+  const inTelegram = !!(tg && tg.platform && tg.platform !== "unknown");
+  if (inTelegram) document.documentElement.setAttribute("data-tg", "");
+  const MAX_BYTES = 4096;
+  const EX_SUGGEST = ["rotto", "guasto", "non funzionante", "ricambi", "cover", "custodia", "scatola vuota",
+                      "solo scatola", "bloccato", "icloud", "replica", "cerco", "scambio"];
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") n.className = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else n.setAttribute(k, v);
+    }
+    for (const kid of kids) if (kid != null) n.append(kid);
+    return n;
+  };
+  const haptic = (t = "light") => { try { tg.HapticFeedback.impactOccurred(t); } catch (_) {} };
+  const alertMsg = (m) => (inTelegram && tg.isVersionAtLeast("6.2")) ? tg.showAlert(m) : window.alert(m);
+  const confirmMsg = (m) => new Promise((res) =>
+    (inTelegram && tg.isVersionAtLeast("6.2")) ? tg.showConfirm(m, res) : res(window.confirm(m)));
+  const fmtPrice = (s) => s.mx ? `${s.mn ? s.mn + "–" : "≤ "}${s.mx} €` : s.mn ? `≥ ${s.mn} €` : "qualsiasi prezzo";
+
+  // ---------- stato -------------------------------------------------------
+  let searches = [];          // stato originale dal bot (forma compatta)
+  let ops = [];               // modifiche in attesa
+  let nextTmp = -1;           // id temporanei per le ricerche nuove
+  let editing = null;         // ricerca in modifica (copia)
+  let notice = "";            // avviso persistente (errori di caricamento, anteprima)
+
+  async function decodeState(b64) {
+    const pad = b64.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((b64.length + 3) % 4);
+    const bytes = Uint8Array.from(atob(pad), (c) => c.charCodeAt(0));
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return JSON.parse(await new Response(stream).text());
+  }
+
+  const current = () => {             // stato originale + modifiche locali
+    const map = new Map(searches.map((s) => [s.i, { ...s }]));
+    for (const op of ops) {
+      if (op.op === "save") map.set(op.id ?? op.tmp, { ...op.s, i: op.id ?? op.tmp, pa: map.get(op.id)?.pa });
+      else if (op.op === "del") map.delete(op.id);
+      else if (op.op === "pause" && map.has(op.id)) map.get(op.id).pa = op.v ? 1 : 0;
+    }
+    return [...map.values()];
+  };
+
+  function pushOp(op) {
+    if (op.op === "save") {
+      ops = ops.filter((o) => !(o.op === "save" && (op.id != null ? o.id === op.id : o.tmp === op.tmp)));
+    } else if (op.op === "del") {
+      if (op.id < 0) { ops = ops.filter((o) => o.tmp !== op.id); return render(); }
+      ops = ops.filter((o) => o.id !== op.id);
+    } else if (op.op === "pause") {
+      const orig = searches.find((s) => s.i === op.id);
+      ops = ops.filter((o) => !(o.op === "pause" && o.id === op.id));
+      if (orig && !!orig.pa === op.v) return render();     // tornato allo stato iniziale
+    }
+    ops.push(op);
+    render();
+  }
+
+  const payload = () => JSON.stringify({ v: 1, ops: ops.map(({ tmp, ...o }) => o) });
+
+  // ---------- lista -------------------------------------------------------
+  function render() {
+    const list = $("list"), items = current();
+    list.replaceChildren();
+    $("subtitle").textContent = items.length
+      ? `${items.length} ricerch${items.length === 1 ? "a" : "e"} · tocca per modificare`
+      : "Nessuna ricerca ancora.";
+    if (!items.length) list.append(el("div", { class: "empty" }, "Crea la prima ricerca con “Nuova ricerca”."));
+    for (const s of items) {
+      const pills = [el("span", { class: "pill" }, fmtPrice(s))];
+      if (s.i < 0) pills.unshift(el("span", { class: "pill new" }, "nuova"));
+      else if (ops.some((o) => o.id === s.i)) pills.unshift(el("span", { class: "pill new" }, "modificata"));
+      for (const t of s.ex || []) pills.push(el("span", { class: "pill ex" }, "−" + t));
+      for (const g of s.in || []) pills.push(el("span", { class: "pill" }, "+" + g.join("|")));
+      if (s.r) pills.push(el("span", { class: "pill" }, `≥${String(s.r).replace(".", ",")}★`));
+      if (s.rv) pills.push(el("span", { class: "pill" }, `≥${s.rv} rec.`));
+      if (s.ns) pills.push(el("span", { class: "pill" }, "no negozi"));
+      if (s.sh) pills.push(el("span", { class: "pill" }, "📦 spedizione"));
+      if (s.t) pills.push(el("span", { class: "pill" }, `topic ${s.t}`));
+
+      const sw = el("input", { type: "checkbox", "aria-label": "Attiva" });
+      sw.checked = !s.pa;
+      if (s.i < 0) sw.disabled = true;
+      sw.addEventListener("click", (e) => e.stopPropagation());
+      sw.addEventListener("change", () => { haptic(); pushOp({ op: "pause", id: s.i, v: !sw.checked }); });
+      const swWrap = el("label", { class: "switch", onclick: (e) => e.stopPropagation() }, sw, el("span"));
+
+      list.append(el("div", { class: "item" + (s.pa ? " paused" : ""), onclick: () => openEditor(s) },
+        el("div", { class: "title" }, el("span", { class: "badge " + s.p }, s.p === "subito" ? "SB" : "WP"),
+          el("span", {}, (s.i > 0 ? `#${s.i} ` : "") + s.k)),
+        swWrap,
+        el("div", { class: "meta" }, ...pills)));
+    }
+    const n = ops.length, banner = $("banner");
+    banner.className = "banner" + (n ? "" : notice ? " warn" : " hidden");
+    if (n) banner.replaceChildren(el("span", {}, el("b", {}, `${n} modific${n === 1 ? "a" : "he"}`),
+      " da inviare al bot. Premi “Salva” in basso."));
+    else banner.textContent = notice;
+    if (inTelegram && tg.isVersionAtLeast("6.2")) n ? tg.enableClosingConfirmation() : tg.disableClosingConfirmation();
+    updateSaveButton();
+  }
+
+  function updateSaveButton() {
+    const n = ops.length, text = `Salva ${n} modific${n === 1 ? "a" : "he"}`;
+    const listVisible = !$("viewList").classList.contains("hidden");
+    if (inTelegram) {
+      if (n && listVisible) { tg.MainButton.setText(text); tg.MainButton.show(); } else tg.MainButton.hide();
+    } else {
+      const b = $("fallbackSave");
+      b.textContent = text + " (anteprima)";
+      b.classList.toggle("hidden", !(n && listVisible));
+    }
+  }
+
+  function save() {
+    const data = payload(), size = new TextEncoder().encode(data).length;
+    if (size > MAX_BYTES) return alertMsg(`Troppe modifiche in una volta (${size} byte, max ${MAX_BYTES}). Salvane una parte e riapri.`);
+    if (inTelegram) {                                                // Telegram chiude la Mini App
+      haptic("medium");
+      if (tg.isVersionAtLeast("6.2")) tg.disableClosingConfirmation();
+      tg.sendData(data);
+    }
+    else { $("dev").classList.remove("hidden"); $("dev").textContent = "sendData →\n" + data; }
+  }
+
+  // ---------- editor ------------------------------------------------------
+  const chipState = { ex: [], in: [] };
+
+  function renderChips(kind) {
+    const box = $(kind + "Chips");
+    box.replaceChildren(...chipState[kind].map((t, i) => el("span", { class: "chip" + (kind === "ex" ? " ex" : "") },
+      kind === "in" ? t.join(" | ") : t,
+      el("button", { type: "button", "aria-label": "Rimuovi", onclick: () => { chipState[kind].splice(i, 1); renderChips(kind); } }, "×"))));
+    if (kind === "ex") {
+      const have = new Set(chipState.ex.map((t) => t.toLowerCase()));
+      $("exSuggest").replaceChildren(...EX_SUGGEST.filter((t) => !have.has(t)).slice(0, 8).map((t) =>
+        el("button", { type: "button", onclick: () => addChip("ex", t) }, "+ " + t)));
+    }
+  }
+
+  function addChip(kind, raw) {
+    const errs = $("formErr");
+    for (const piece of raw.split(",")) {
+      const t = piece.trim();
+      if (!t) continue;
+      if (chipState[kind].length >= 20) { errs.textContent = "Massimo 20 parole per lista."; break; }
+      if (kind === "in") {
+        const alts = t.split("|").map((a) => a.trim()).filter(Boolean);
+        if (alts.some((a) => a.length > 40)) { errs.textContent = "Parola troppo lunga (max 40)."; continue; }
+        if (alts.length) chipState.in.push(alts);
+      } else {
+        if (t.length > 40) { errs.textContent = "Parola troppo lunga (max 40)."; continue; }
+        if (!chipState.ex.some((x) => x.toLowerCase() === t.toLowerCase())) chipState.ex.push(t);
+      }
+    }
+    renderChips(kind);
+  }
+
+  function bindChipInput(kind) {
+    const input = $(kind === "ex" ? "fExIn" : "fInIn");
+    const commit = () => { if (input.value.trim()) { addChip(kind, input.value); input.value = ""; } };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); commit(); } });
+    input.addEventListener("blur", commit);
+  }
+
+  function setSeg(id, value) {
+    for (const b of $(id).querySelectorAll("button")) b.classList.toggle("on", b.dataset.v === String(value ?? ""));
+  }
+  const getSeg = (id) => $(id).querySelector("button.on")?.dataset.v ?? "";
+  for (const id of ["fPlatform", "fRating"]) {
+    $(id).addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { setSeg(id, b.dataset.v); haptic(); } });
+  }
+
+  function openEditor(s) {
+    editing = s ? { ...s } : { i: null, p: "subito" };
+    $("editTitle").textContent = s ? (s.i > 0 ? `Ricerca #${s.i}` : "Nuova ricerca") : "Nuova ricerca";
+    setSeg("fPlatform", editing.p);
+    $("fKeyword").value = editing.k || "";
+    $("fMin").value = editing.mn ?? "";
+    $("fMax").value = editing.mx ?? "";
+    chipState.ex = [...(editing.ex || [])];
+    chipState.in = (editing.in || []).map((g) => [...g]);
+    renderChips("ex"); renderChips("in");
+    $("fExIn").value = ""; $("fInIn").value = "";
+    $("fDesc").checked = !!editing.d;
+    setSeg("fRating", editing.r ?? "");
+    $("fReviews").value = editing.rv ?? "";
+    $("fNoShop").checked = !!editing.ns;
+    $("fShip").checked = !!editing.sh;
+    $("fCat").value = editing.c ?? "";
+    $("fTopic").value = editing.t ?? "";
+    $("formErr").textContent = "";
+    $("btnDelete").classList.toggle("hidden", !s);
+    show("edit");
+    if (!s) setTimeout(() => $("fKeyword").focus(), 50);
+  }
+
+  function readForm() {
+    // le parole ancora nel campo di testo contano come confermate
+    for (const k of ["ex", "in"]) { const inp = $(k === "ex" ? "fExIn" : "fInIn"); if (inp.value.trim()) { addChip(k, inp.value); inp.value = ""; } }
+    const num = (v) => v === "" ? null : Number(v);
+    const s = {
+      p: getSeg("fPlatform"), k: $("fKeyword").value.trim(),
+      mn: num($("fMin").value), mx: num($("fMax").value),
+      c: $("fCat").value.trim() || null, t: num($("fTopic").value),
+      in: chipState.in, ex: chipState.ex, d: $("fDesc").checked ? 1 : 0,
+      r: getSeg("fRating") === "" ? null : Number(getSeg("fRating")),
+      rv: num($("fReviews").value), ns: $("fNoShop").checked ? 1 : 0, sh: $("fShip").checked ? 1 : 0,
+    };
+    if (!["subito", "wallapop"].includes(s.p)) return "Scegli la piattaforma.";
+    if (!s.k) return "Scrivi cosa cerchi.";
+    for (const [v, name] of [[s.mn, "minimo"], [s.mx, "massimo"]])
+      if (v !== null && (!Number.isFinite(v) || v < 0)) return `Prezzo ${name} non valido.`;
+    if (s.mn !== null && s.mx !== null && s.mn > s.mx) return "Il prezzo minimo supera il massimo.";
+    if (s.rv !== null && (!Number.isInteger(s.rv) || s.rv < 0)) return "Recensioni minime: numero intero ≥ 0.";
+    if (s.t !== null && (!Number.isInteger(s.t) || s.t < 2)) return "ID Topic non valido.";
+    for (const k of Object.keys(s)) if (s[k] === null || (Array.isArray(s[k]) && !s[k].length) || s[k] === 0) delete s[k];
+    return s;
+  }
+
+  $("btnApply").addEventListener("click", () => {
+    const s = readForm();
+    if (typeof s === "string") { $("formErr").textContent = s; haptic("rigid"); return; }
+    if (editing.i == null) pushOp({ op: "save", tmp: nextTmp--, s });
+    else if (editing.i < 0) pushOp({ op: "save", tmp: editing.i, s });
+    else pushOp({ op: "save", id: editing.i, s });
+    haptic("medium");
+    show("list");
+  });
+  $("btnCancel").addEventListener("click", () => show("list"));
+  $("btnDelete").addEventListener("click", async () => {
+    if (await confirmMsg(`Eliminare “${editing.k}”?`)) { pushOp({ op: "del", id: editing.i }); show("list"); }
+  });
+  $("btnNew").addEventListener("click", () => openEditor(null));
+  $("fallbackSave").addEventListener("click", save);
+  bindChipInput("ex"); bindChipInput("in");
+
+  function show(view) {
+    $("viewList").classList.toggle("hidden", view !== "list");
+    $("viewEdit").classList.toggle("hidden", view !== "edit");
+    window.scrollTo(0, 0);
+    if (inTelegram && tg.isVersionAtLeast("6.1")) view === "edit" ? tg.BackButton.show() : tg.BackButton.hide();
+    if (view === "list") render(); else updateSaveButton();
+  }
+
+  // ---------- avvio -------------------------------------------------------
+  async function init() {
+    if (inTelegram) {
+      tg.ready(); tg.expand();
+      tg.MainButton.onClick(save);
+      if (tg.isVersionAtLeast("6.1")) tg.BackButton.onClick(() => show("list"));
+    }
+    const param = new URLSearchParams(location.search).get("s");
+    if (param) {
+      try { searches = await decodeState(param); }
+      catch (e) {
+        notice = "Impossibile leggere le ricerche: aggiorna Telegram o riapri dal bottone del bot.";
+        console.error(e);
+      }
+    } else if (!inTelegram) {
+      notice = "Anteprima fuori da Telegram: apri la pagina dal bottone “🗂 Gestisci ricerche” del bot.";
+    }
+    show("list");
+  }
+  init();
+})();
+</script>
+</body>
+</html>
