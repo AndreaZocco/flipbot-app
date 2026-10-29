@@ -189,7 +189,8 @@
     <div class="field">
       <label class="lbl" for="fKeyword">Cosa cerchi</label>
       <input type="text" id="fKeyword" maxlength="80" placeholder="es. nintendo switch oled" autocomplete="off">
-      <div class="help">Vuoto = <b>tutta la categoria</b>: serve una categoria e un prezzo max fino a 50 €.
+      <div class="help">Vuoto = <b>tutta la categoria</b>: serve una categoria e un prezzo max fino a 50 €
+        (fino a 300 € se metti parole obbligatorie, es. 3ds|2ds|game boy, o il catalogo).
         Con 🎯 qui sotto ricevi solo gli annunci che nominano un gioco Pokémon, anche con titoli generici.</div>
     </div>
     <div class="field">
@@ -625,7 +626,9 @@
     };
     if (!["subito", "wallapop", "both"].includes(s.p) || (s.p === "both" && editing.i > 0)) return "Scegli la piattaforma.";
     if (!s.k && !s.c) return "Scrivi cosa cerchi, oppure lascia vuoto e scegli una categoria (es. 44).";
-    if (!s.k && !(s.mx > 0 && s.mx <= 50)) return "Senza parola chiave serve un prezzo massimo fino a 50 €.";
+    const cap = (s.in.length || s.ct) ? 300 : 50;  // con parole obbligatorie o catalogo decide il filtro
+    if (!s.k && !(s.mx > 0 && s.mx <= cap)) return `Senza parola chiave serve un prezzo massimo fino a ${cap} €` +
+      (cap === 50 ? " (300 € con parole obbligatorie o catalogo)." : ".");
     if (s.dr && !(s.mx > 0)) return "Per gli avvisi di ribasso serve un prezzo massimo.";
     for (const [v, name] of [[s.mn, "minimo"], [s.mx, "massimo"]])
       if (v !== null && (!Number.isFinite(v) || v < 0)) return `Prezzo ${name} non valido.`;
