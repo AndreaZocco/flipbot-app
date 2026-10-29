@@ -190,7 +190,7 @@
       <label class="lbl" for="fKeyword">Cosa cerchi</label>
       <input type="text" id="fKeyword" maxlength="80" placeholder="es. nintendo switch oled" autocomplete="off">
       <div class="help">Vuoto = <b>tutta la categoria</b>: serve una categoria e un prezzo max fino a 50 €
-        (fino a 300 € se metti parole obbligatorie, es. 3ds|2ds|game boy, o il catalogo).
+        (fino a 300 € se metti parole obbligatorie, es. 3ds|2ds|game boy, il catalogo o “solo console”).
         Con 🎯 qui sotto ricevi solo gli annunci che nominano un gioco Pokémon, anche con titoli generici.</div>
     </div>
     <div class="field">
@@ -247,6 +247,15 @@
       <div class="help">Tiene solo gli annunci che nominano un gioco Pokémon nel titolo o nella descrizione:
         Scarlatto/Escarlata/Scarlet, Leggende Arceus, Let’s Go, Spada/Scudo, Diamante Lucente… anche con refusi
         (pokèmon, pokemn). La scheda dice quale gioco ha riconosciuto.</div>
+    </div>
+    <div class="field">
+      <div class="inline">
+        <span>🎮 Solo console</span>
+        <label class="switch"><input type="checkbox" id="fConsoles"><span></span></label>
+      </div>
+      <div class="help">Scarta giochi, controller e accessori capendo il tipo dal titolo: “Nintendo 3DS XL blu” e
+        “DS Lite con 3 giochi” passano, “Mario Kart DS” e “Custodia 3DS” no. Utile su Subito, che ha una sola
+        categoria per console e giochi.</div>
     </div>
     <div class="field inline">
       <span>Cerca anche nella descrizione</span>
@@ -446,6 +455,7 @@
       if (s.j) pills.push(el("span", { class: "pill" }, "🛡"));
       if (s.ct) pills.push(el("span", { class: "pill" }, "🎯 Pokémon"));
       if (s.dr) pills.push(el("span", { class: "pill" }, "📉 ribassi"));
+      if (s.cs) pills.push(el("span", { class: "pill" }, "🎮 solo console"));
       if (s.co && s.co.length) pills.push(el("span", { class: "pill" }, s.co.map((c) => COND_LABEL[c] || c).join(", ")));
       if (s.lo) pills.push(el("span", { class: "pill" }, "📍 " + s.lo + (s.km && s.p !== "subito" ? ` · ${s.km} km` : "")));
       if (s.t) pills.push(el("span", { class: "pill" }, `topic ${s.t}`));
@@ -588,6 +598,7 @@
     $("fFast").checked = !!editing.f;
     $("fDrops").checked = !!editing.dr;
     $("fCatalog").checked = !!editing.ct;
+    $("fConsoles").checked = !!editing.cs;
     $("fJunk").checked = s ? !!editing.j : true;  // attivo di default sulle ricerche nuove
     for (const b of $("fCond").querySelectorAll("button")) b.classList.toggle("on", (editing.co || []).includes(b.dataset.v));
     $("fLoc").value = editing.lo ?? "";
@@ -621,14 +632,15 @@
       f: $("fFast").checked ? 1 : 0,
       j: $("fJunk").checked ? 1 : 0,
       ct: $("fCatalog").checked ? "pokemon" : null, dr: $("fDrops").checked ? 1 : 0,
+      cs: $("fConsoles").checked ? 1 : 0,
       co: [...$("fCond").querySelectorAll("button.on")].map((b) => b.dataset.v),
       lo: $("fLoc").value.trim() || null, km: $("fLoc").value.trim() && !$("fKm").disabled ? Number($("fKm").value) : null,
     };
     if (!["subito", "wallapop", "both"].includes(s.p) || (s.p === "both" && editing.i > 0)) return "Scegli la piattaforma.";
     if (!s.k && !s.c) return "Scrivi cosa cerchi, oppure lascia vuoto e scegli una categoria (es. 44).";
-    const cap = (s.in.length || s.ct) ? 300 : 50;  // con parole obbligatorie o catalogo decide il filtro
+    const cap = (s.in.length || s.ct || s.cs) ? 300 : 50;  // con parole obbligatorie, catalogo o solo console decide il filtro
     if (!s.k && !(s.mx > 0 && s.mx <= cap)) return `Senza parola chiave serve un prezzo massimo fino a ${cap} €` +
-      (cap === 50 ? " (300 € con parole obbligatorie o catalogo)." : ".");
+      (cap === 50 ? " (300 € con parole obbligatorie, catalogo o solo console)." : ".");
     if (s.dr && !(s.mx > 0)) return "Per gli avvisi di ribasso serve un prezzo massimo.";
     for (const [v, name] of [[s.mn, "minimo"], [s.mx, "massimo"]])
       if (v !== null && (!Number.isFinite(v) || v < 0)) return `Prezzo ${name} non valido.`;
@@ -641,8 +653,8 @@
         .reduce((n, x) => n + (x.p === "both" ? 2 : 1), 0);
       if (others + (s.p === "both" ? 2 : 1) > 5) return `Massimo 5 ricerche ⚡ veloci (ne hai già ${others}).`;
     }
-    // ct e dr sempre presenti: il bot tiene il valore di prima solo se mancano (pagina di una versione vecchia)
-    for (const k of Object.keys(s)) if (!["ct", "dr"].includes(k) && (s[k] === null || (Array.isArray(s[k]) && !s[k].length) || s[k] === 0)) delete s[k];
+    // ct, dr e cs sempre presenti: il bot tiene il valore di prima solo se mancano (pagina di una versione vecchia)
+    for (const k of Object.keys(s)) if (!["ct", "dr", "cs"].includes(k) && (s[k] === null || (Array.isArray(s[k]) && !s[k].length) || s[k] === 0)) delete s[k];
     return s;
   }
 
