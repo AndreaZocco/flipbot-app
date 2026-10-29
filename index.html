@@ -382,7 +382,10 @@
     render();
   }
 
-  const payload = () => JSON.stringify({ v: 1, ops: ops.map(({ tmp, ...o }) => o) });
+  // prima le operazioni che liberano posti ⚡: il bot le applica nell'ordine in cui arrivano
+  const freesFast = (o) => o.op === "del" || (o.op === "pause" && o.v) || (o.op === "save" && !o.s.f);
+  const payload = () => JSON.stringify({ v: 1, ops: [...ops.filter(freesFast), ...ops.filter((o) => !freesFast(o))]
+    .map(({ tmp, ...o }) => o) });
 
   // ---------- lista -------------------------------------------------------
   function render() {
@@ -583,7 +586,8 @@
     if (s.mn !== null && s.mx !== null && s.mn > s.mx) return "Il prezzo minimo supera il massimo.";
     if (s.rv !== null && (!Number.isInteger(s.rv) || s.rv < 0)) return "Recensioni minime: numero intero ≥ 0.";
     if (s.t !== null && (!Number.isInteger(s.t) || s.t < 2 || s.t > 2147483647)) return "ID Topic non valido.";
-    if (s.f) {
+    const cur = editing.i > 0 ? current().find((x) => x.i === editing.i) : null;
+    if (s.f && !(cur && cur.pa)) {  // in pausa non conta: il limite vale alla ripresa
       const others = current().filter((x) => x.f && !x.pa && x.i !== editing.i)
         .reduce((n, x) => n + (x.p === "both" ? 2 : 1), 0);
       if (others + (s.p === "both" ? 2 : 1) > 5) return `Massimo 5 ricerche ⚡ veloci (ne hai già ${others}).`;
