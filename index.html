@@ -81,7 +81,7 @@
   .field.inline, .inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   label.lbl { display: block; font-size: 13px; color: var(--hint); margin-bottom: 6px; }
   .help { font-size: 12px; color: var(--hint); margin-top: 6px; }
-  input[type=text], input[type=number], input[type=search] {
+  input[type=text], input[type=number], input[type=search], textarea {
     width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid transparent;
     border-radius: 10px; padding: 10px 12px; outline: none; }
   input:focus { border-color: var(--accent); }
@@ -161,6 +161,14 @@
         <option value="10">10 annunci</option><option value="0">mai (sempre schede singole)</option>
       </select>
     </div>
+    <div class="field">
+      <label class="lbl" for="fMsg">📋 Messaggio da copiare per il venditore</label>
+      <textarea id="fMsg" maxlength="200" rows="2"></textarea>
+      <label class="lbl" for="fMsgEs" style="margin-top:10px">🇪🇸 Per gli annunci dalla Spagna</label>
+      <textarea id="fMsgEs" maxlength="200" rows="2"></textarea>
+      <div class="help">Il bottone 📋 sotto ogni scheda copia questo testo: incollalo nella chat con il venditore.
+        {prezzo} e {titolo} vengono sostituiti. Vuoto = messaggio predefinito.</div>
+    </div>
   </div>
 </main>
 
@@ -218,6 +226,14 @@
     <div class="field inline">
       <span>Cerca anche nella descrizione</span>
       <label class="switch"><input type="checkbox" id="fDesc"><span></span></label>
+    </div>
+    <div class="field">
+      <div class="inline">
+        <span>🛡 Anti-fregature</span>
+        <label class="switch"><input type="checkbox" id="fJunk"><span></span></label>
+      </div>
+      <div class="help">Scarta “solo custodia”, scatole vuote, codici digitali, repro (anche in spagnolo) e segnala
+        sulla scheda “senza custodia” e “non funzionante”. Pensato per videogiochi.</div>
     </div>
   </div>
 
@@ -406,6 +422,7 @@
       if (s.ns) pills.push(el("span", { class: "pill" }, "no negozi"));
       if (s.sh) pills.push(el("span", { class: "pill" }, "📦 spedizione"));
       if (s.es) pills.push(el("span", { class: "pill" }, "🇪🇸 anche Spagna"));
+      if (s.j) pills.push(el("span", { class: "pill" }, "🛡"));
       if (s.co && s.co.length) pills.push(el("span", { class: "pill" }, s.co.map((c) => COND_LABEL[c] || c).join(", ")));
       if (s.lo) pills.push(el("span", { class: "pill" }, "📍 " + s.lo + (s.km && s.p !== "subito" ? ` · ${s.km} km` : "")));
       if (s.t) pills.push(el("span", { class: "pill" }, `topic ${s.t}`));
@@ -546,6 +563,7 @@
     $("fShip").checked = !!editing.sh;
     $("fSpain").checked = !!editing.es;
     $("fFast").checked = !!editing.f;
+    $("fJunk").checked = s ? !!editing.j : true;  // attivo di default sulle ricerche nuove
     for (const b of $("fCond").querySelectorAll("button")) b.classList.toggle("on", (editing.co || []).includes(b.dataset.v));
     $("fLoc").value = editing.lo ?? "";
     const km = String(editing.km ?? 30);
@@ -576,6 +594,7 @@
       rv: num($("fReviews").value), ns: $("fNoShop").checked ? 1 : 0, sh: $("fShip").checked ? 1 : 0,
       es: $("fSpain").checked && getSeg("fPlatform") !== "subito" ? 1 : 0,
       f: $("fFast").checked ? 1 : 0,
+      j: $("fJunk").checked ? 1 : 0,
       co: [...$("fCond").querySelectorAll("button.on")].map((b) => b.dataset.v),
       lo: $("fLoc").value.trim() || null, km: $("fLoc").value.trim() && !$("fKm").disabled ? Number($("fKm").value) : null,
     };
@@ -641,7 +660,11 @@
   // ---------- impostazioni ------------------------------------------------
   for (const id of ["fQuietFrom", "fQuietTo"])
     $(id).replaceChildren(...Array.from({ length: 24 }, (_, h) => el("option", { value: String(h) }, `${String(h).padStart(2, "0")}:00`)));
+  const DEFAULT_MSG = "Ciao! È ancora disponibile? Lo prendo a {prezzo}, posso pagare subito 🙂";
+  const DEFAULT_MSG_ES = "¡Hola! ¿Sigue disponible? Me lo quedo por {prezzo}, puedo pagar ahora mismo 🙂";
+  $("fMsg").placeholder = DEFAULT_MSG; $("fMsgEs").placeholder = DEFAULT_MSG_ES;
   function renderSettings() {
+    $("fMsg").value = settings.m ?? ""; $("fMsgEs").value = settings.me ?? "";
     const q = settings.q;
     $("fQuietOn").checked = !!q;
     $("quietHours").classList.toggle("hidden", !q);
@@ -654,13 +677,16 @@
     $("quietHours").classList.toggle("hidden", !on);
     const q = on ? [Number($("fQuietFrom").value), Number($("fQuietTo").value)] : null;
     if (q && q[0] === q[1]) { alertMsg("Inizio e fine del silenzio non possono coincidere."); $("fQuietTo").value = String((q[0] + 8) % 24); return onSettingsChange(); }
-    const op = { op: "settings", q, dg: Number($("fDigest").value) };
+    const op = { op: "settings", q, dg: Number($("fDigest").value),
+                 m: $("fMsg").value.trim() || null, me: $("fMsgEs").value.trim() || null };
     ops = ops.filter((o) => o.op !== "settings");
-    const same = JSON.stringify(op.q) === JSON.stringify(settings.q ?? null) && op.dg === (settings.dg ?? 5);
+    const same = JSON.stringify(op.q) === JSON.stringify(settings.q ?? null) && op.dg === (settings.dg ?? 5)
+      && op.m === (settings.m ?? null) && op.me === (settings.me ?? null);
     if (!same) ops.push(op);
     haptic(); render();
   }
   for (const id of ["fQuietOn", "fQuietFrom", "fQuietTo", "fDigest"]) $(id).addEventListener("change", onSettingsChange);
+  for (const id of ["fMsg", "fMsgEs"]) $(id).addEventListener("input", onSettingsChange);
   $("fallbackSave").addEventListener("click", save);
   bindChipInput("ex"); bindChipInput("in");
 
@@ -684,7 +710,10 @@
       try {
         const st = await decodeState(param);
         if (Array.isArray(st)) searches = st;                     // formato della prima versione
-        else { searches = st.s || []; settings = { q: st.cfg?.q ?? null, dg: st.cfg?.dg ?? 5 }; }
+        else {
+          searches = st.s || [];
+          settings = { q: st.cfg?.q ?? null, dg: st.cfg?.dg ?? 5, m: st.cfg?.m ?? null, me: st.cfg?.me ?? null };
+        }
       }
       catch (e) {
         notice = "Impossibile leggere le ricerche: aggiorna Telegram o riapri dal bottone del bot.";
