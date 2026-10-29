@@ -50,6 +50,7 @@
   .badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: #fff; flex: none; }
   .badge.subito { background: var(--subito); }
   .badge.wallapop { background: var(--wallapop); }
+  .badge.both { background: linear-gradient(90deg, var(--subito), var(--wallapop)); }
   .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg); color: var(--hint);
     overflow-wrap: anywhere; }
   .pill.ex { color: var(--danger); }
@@ -91,6 +92,7 @@
   .seg button.on { background: var(--card); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
   .seg button.on.subito { color: var(--subito); }
   .seg button.on.wallapop { color: var(--wallapop); }
+  .seg button.on.both { color: var(--text); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   .chips:empty { display: none; }
   .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 10px; border-radius: 999px;
@@ -172,7 +174,9 @@
       <div class="seg" id="fPlatform">
         <button type="button" data-v="subito" class="subito">Subito</button>
         <button type="button" data-v="wallapop" class="wallapop">Wallapop</button>
+        <button type="button" data-v="both" class="both" id="fBoth">Entrambi</button>
       </div>
+      <div class="help hidden" id="bothHelp">Crea due ricerche con gli stessi filtri, una per sito: poi le modifichi separatamente.</div>
     </div>
     <div class="field">
       <label class="lbl" for="fKeyword">Cosa cerchi</label>
@@ -271,7 +275,8 @@
       <summary>Categoria e Topic</summary>
       <div class="field">
         <label class="lbl" for="fCat">ID categoria (opzionale)</label>
-        <input type="text" id="fCat" maxlength="20" placeholder="es. 44 = Console e Videogiochi su Subito" autocomplete="off">
+        <input type="text" id="fCat" maxlength="20" placeholder="vuoto = tutte le categorie" autocomplete="off">
+        <div class="help" id="catHelp"></div>
       </div>
       <div class="field">
         <label class="lbl" for="fTopic">ID Topic del supergruppo (opzionale)</label>
@@ -381,7 +386,7 @@
       if (s.ns) pills.push(el("span", { class: "pill" }, "no negozi"));
       if (s.sh) pills.push(el("span", { class: "pill" }, "📦 spedizione"));
       if (s.co && s.co.length) pills.push(el("span", { class: "pill" }, s.co.map((c) => COND_LABEL[c] || c).join(", ")));
-      if (s.lo) pills.push(el("span", { class: "pill" }, "📍 " + s.lo + (s.km && s.p === "wallapop" ? ` · ${s.km} km` : "")));
+      if (s.lo) pills.push(el("span", { class: "pill" }, "📍 " + s.lo + (s.km && s.p !== "subito" ? ` · ${s.km} km` : "")));
       if (s.t) pills.push(el("span", { class: "pill" }, `topic ${s.t}`));
 
       const sw = el("input", { type: "checkbox", "aria-label": "Attiva" });
@@ -392,7 +397,7 @@
       const swWrap = el("label", { class: "switch", onclick: (e) => e.stopPropagation() }, sw, el("span"));
 
       list.append(el("div", { class: "item" + (s.pa ? " paused" : ""), onclick: () => openEditor(s) },
-        el("div", { class: "title" }, el("span", { class: "badge " + s.p }, s.p === "subito" ? "SB" : "WP"),
+        el("div", { class: "title" }, el("span", { class: "badge " + s.p }, { subito: "SB", wallapop: "WP", both: "SB+WP" }[s.p] || s.p),
           el("span", {}, (s.i > 0 ? `#${s.i} ` : "") + s.k)),
         swWrap,
         el("div", { class: "meta" }, ...pills)));
@@ -482,13 +487,29 @@
   }
   const getSeg = (id) => $(id).querySelector("button.on")?.dataset.v ?? "";
   for (const id of ["fPlatform", "fRating"]) {
-    $(id).addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) { setSeg(id, b.dataset.v); haptic(); } });
+    $(id).addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b) { setSeg(id, b.dataset.v); haptic(); if (id === "fPlatform") platformHints(); }
+    });
+  }
+  const CAT_HELP = {
+    subito: "ID o nome Subito, es. 44 o videogiochi.",
+    wallapop: "ID Wallapop, es. 24200/24203 = Console e videogiochi (importando un link è automatico).",
+    both: "Usa l’ID Subito (es. 44 o videogiochi): per Wallapop uso la categoria equivalente.",
+  };
+  function platformHints() {
+    const p = getSeg("fPlatform");
+    $("catHelp").textContent = CAT_HELP[p] || "";
+    $("bothHelp").classList.toggle("hidden", p !== "both");
   }
 
   function openEditor(s) {
     editing = s ? { ...s } : { i: null, p: "subito" };
     $("editTitle").textContent = s ? (s.i > 0 ? `Ricerca #${s.i}` : "Nuova ricerca") : "Nuova ricerca";
+    // "Entrambi" crea due ricerche: una ricerca già salvata resta su un solo sito
+    $("fBoth").classList.toggle("hidden", !!(s && s.i > 0));
     setSeg("fPlatform", editing.p);
+    platformHints();
     $("fKeyword").value = editing.k || "";
     $("fMin").value = editing.mn ?? "";
     $("fMax").value = editing.mx ?? "";
@@ -532,7 +553,7 @@
       co: [...$("fCond").querySelectorAll("button.on")].map((b) => b.dataset.v),
       lo: $("fLoc").value.trim() || null, km: $("fLoc").value.trim() && !$("fKm").disabled ? Number($("fKm").value) : null,
     };
-    if (!["subito", "wallapop"].includes(s.p)) return "Scegli la piattaforma.";
+    if (!["subito", "wallapop", "both"].includes(s.p) || (s.p === "both" && editing.i > 0)) return "Scegli la piattaforma.";
     if (!s.k) return "Scrivi cosa cerchi.";
     for (const [v, name] of [[s.mn, "minimo"], [s.mx, "massimo"]])
       if (v !== null && (!Number.isFinite(v) || v < 0)) return `Prezzo ${name} non valido.`;
