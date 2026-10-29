@@ -190,6 +190,14 @@
       </div>
       <div class="help">Consiglio: max ≈ 1/3 del prezzo a cui lo rivendi.</div>
     </div>
+    <div class="field">
+      <div class="inline">
+        <span>⚡ Priorità alta</span>
+        <label class="switch"><input type="checkbox" id="fFast"><span></span></label>
+      </div>
+      <div class="help">Controllata ogni 10-18 secondi invece che ogni minuto, con suono anche nelle ore di silenzio.
+        Massimo 5: più richieste ravvicinate aumentano il rischio di blocco.</div>
+    </div>
   </div>
 
   <h2>Parole</h2>
@@ -408,7 +416,7 @@
 
       list.append(el("div", { class: "item" + (s.pa ? " paused" : ""), onclick: () => openEditor(s) },
         el("div", { class: "title" }, el("span", { class: "badge " + s.p }, { subito: "SB", wallapop: "WP", both: "SB+WP" }[s.p] || s.p),
-          el("span", {}, (s.i > 0 ? `#${s.i} ` : "") + s.k)),
+          el("span", {}, (s.f ? "⚡ " : "") + (s.i > 0 ? `#${s.i} ` : "") + s.k)),
         swWrap,
         el("div", { class: "meta" }, ...pills)));
     }
@@ -534,6 +542,7 @@
     $("fNoShop").checked = !!editing.ns;
     $("fShip").checked = !!editing.sh;
     $("fSpain").checked = !!editing.es;
+    $("fFast").checked = !!editing.f;
     for (const b of $("fCond").querySelectorAll("button")) b.classList.toggle("on", (editing.co || []).includes(b.dataset.v));
     $("fLoc").value = editing.lo ?? "";
     const km = String(editing.km ?? 30);
@@ -563,6 +572,7 @@
       r: getSeg("fRating") === "" ? null : Number(getSeg("fRating")),
       rv: num($("fReviews").value), ns: $("fNoShop").checked ? 1 : 0, sh: $("fShip").checked ? 1 : 0,
       es: $("fSpain").checked && getSeg("fPlatform") !== "subito" ? 1 : 0,
+      f: $("fFast").checked ? 1 : 0,
       co: [...$("fCond").querySelectorAll("button.on")].map((b) => b.dataset.v),
       lo: $("fLoc").value.trim() || null, km: $("fLoc").value.trim() && !$("fKm").disabled ? Number($("fKm").value) : null,
     };
@@ -573,6 +583,11 @@
     if (s.mn !== null && s.mx !== null && s.mn > s.mx) return "Il prezzo minimo supera il massimo.";
     if (s.rv !== null && (!Number.isInteger(s.rv) || s.rv < 0)) return "Recensioni minime: numero intero ≥ 0.";
     if (s.t !== null && (!Number.isInteger(s.t) || s.t < 2 || s.t > 2147483647)) return "ID Topic non valido.";
+    if (s.f) {
+      const others = current().filter((x) => x.f && !x.pa && x.i !== editing.i)
+        .reduce((n, x) => n + (x.p === "both" ? 2 : 1), 0);
+      if (others + (s.p === "both" ? 2 : 1) > 5) return `Massimo 5 ricerche ⚡ veloci (ne hai già ${others}).`;
+    }
     for (const k of Object.keys(s)) if (s[k] === null || (Array.isArray(s[k]) && !s[k].length) || s[k] === 0) delete s[k];
     return s;
   }
