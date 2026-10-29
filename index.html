@@ -78,7 +78,7 @@
   .section { background: var(--card); border-radius: var(--radius); overflow: hidden; }
   .field { padding: 12px 14px; border-bottom: 1px solid var(--sep); }
   .field:last-child { border-bottom: 0; }
-  .field.inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .field.inline, .inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   label.lbl { display: block; font-size: 13px; color: var(--hint); margin-bottom: 6px; }
   .help { font-size: 12px; color: var(--hint); margin-top: 6px; }
   input[type=text], input[type=number], input[type=search] {
@@ -267,6 +267,15 @@
       <span>Solo annunci con spedizione</span>
       <label class="switch"><input type="checkbox" id="fShip"><span></span></label>
     </div>
+    <div class="field" id="spainRow">
+      <div class="inline">
+        <span>🇪🇸 Anche dalla Spagna (Wallapop)</span>
+        <label class="switch"><input type="checkbox" id="fSpain"><span></span></label>
+      </div>
+      <div class="help">Unico paese da cui Wallapop spedisce in Italia (InPost, fino a 6 giorni, max 20 kg).
+        Arrivano già tradotti; le tue parole vengono tradotte in spagnolo e controllate anche sul testo originale.
+        La zona qui sopra vale solo per l’Italia.</div>
+    </div>
   </div>
 
   <h2>Avanzate</h2>
@@ -385,6 +394,7 @@
       if (s.rv) pills.push(el("span", { class: "pill" }, `≥${s.rv} rec.`));
       if (s.ns) pills.push(el("span", { class: "pill" }, "no negozi"));
       if (s.sh) pills.push(el("span", { class: "pill" }, "📦 spedizione"));
+      if (s.es) pills.push(el("span", { class: "pill" }, "🇪🇸 anche Spagna"));
       if (s.co && s.co.length) pills.push(el("span", { class: "pill" }, s.co.map((c) => COND_LABEL[c] || c).join(", ")));
       if (s.lo) pills.push(el("span", { class: "pill" }, "📍 " + s.lo + (s.km && s.p !== "subito" ? ` · ${s.km} km` : "")));
       if (s.t) pills.push(el("span", { class: "pill" }, `topic ${s.t}`));
@@ -501,6 +511,7 @@
     const p = getSeg("fPlatform");
     $("catHelp").textContent = CAT_HELP[p] || "";
     $("bothHelp").classList.toggle("hidden", p !== "both");
+    $("spainRow").classList.toggle("hidden", p === "subito");
   }
 
   function openEditor(s) {
@@ -522,6 +533,7 @@
     $("fReviews").value = editing.rv ?? "";
     $("fNoShop").checked = !!editing.ns;
     $("fShip").checked = !!editing.sh;
+    $("fSpain").checked = !!editing.es;
     for (const b of $("fCond").querySelectorAll("button")) b.classList.toggle("on", (editing.co || []).includes(b.dataset.v));
     $("fLoc").value = editing.lo ?? "";
     const km = String(editing.km ?? 30);
@@ -550,6 +562,7 @@
       in: chipState.in, ex: chipState.ex, d: $("fDesc").checked ? 1 : 0,
       r: getSeg("fRating") === "" ? null : Number(getSeg("fRating")),
       rv: num($("fReviews").value), ns: $("fNoShop").checked ? 1 : 0, sh: $("fShip").checked ? 1 : 0,
+      es: $("fSpain").checked && getSeg("fPlatform") !== "subito" ? 1 : 0,
       co: [...$("fCond").querySelectorAll("button.on")].map((b) => b.dataset.v),
       lo: $("fLoc").value.trim() || null, km: $("fLoc").value.trim() && !$("fKm").disabled ? Number($("fKm").value) : null,
     };
