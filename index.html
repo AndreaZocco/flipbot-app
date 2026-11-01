@@ -917,15 +917,15 @@
     for (let n = 0; n < pieces.length; n++) {
       const t = pieces[n].trim();
       if (!t) continue;
-      if (chipState[kind].length >= 20) {
-        errs.textContent = "Massimo 20 parole per lista.";
+      if (chipState[kind].length >= 30) {
+        errs.textContent = "Massimo 30 parole per lista.";
         rejected.push(...pieces.slice(n).map((x) => x.trim()).filter(Boolean));
         break;
       }
       if (kind === "in") {
         const alts = t.split("|").map((a) => a.trim()).filter(Boolean);
         if (alts.some((a) => a.length > 40)) { errs.textContent = "Parola troppo lunga (max 40)."; rejected.push(t); continue; }
-        if (alts.length > 20) { errs.textContent = "Massimo 20 alternative per parola."; rejected.push(t); continue; }
+        if (alts.length > 30) { errs.textContent = "Massimo 30 alternative per parola."; rejected.push(t); continue; }
         if (alts.length) chipState.in.push(alts);
       } else {
         if (t.length > 40) { errs.textContent = "Parola troppo lunga (max 40)."; rejected.push(t); continue; }
